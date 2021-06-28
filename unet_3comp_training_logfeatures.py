@@ -41,9 +41,9 @@ import argparse
 # std=args.std # how long do you want the gaussian STD to be?
 # sr=args.sr
 
-train=1 #True # do you want to train?
+train=0 #True # do you want to train?
 drop=1 #True # drop?
-plots=1 #False # do you want to make some plots?
+plots=0 #False # do you want to make some plots?
 resume=0 #False # resume training
 large=0.5 # large unet
 epos=50# how many epocs?
@@ -75,18 +75,6 @@ if large:
 if drop:
     model_save_file="drop_"+model_save_file
 
-# plot the data
-if plots:
-    # plot ps to check
-    plt.figure()
-    for ii in range(20):
-        plt.plot(x_data[ii,:]/np.max(np.abs(x_data[ii,:]))+ii)
-        
-# plot noise to check
-plt.figure()
-for ii in range(20):
-    plt.plot(n_data[ii,:]/np.max(np.abs(n_data[ii,:]))+ii)
-
 # MAKE TRAINING AND TESTING DATA
 print("MAKE TRAINING AND TESTING DATA")
 np.random.seed(0)
@@ -99,6 +87,18 @@ noise_train_inds=np.sort(noiseinds[:int(0.9*len(noiseinds))])
 sig_test_inds=np.sort(siginds[int(0.9*len(siginds)):])
 noise_test_inds=np.sort(noiseinds[int(0.9*len(noiseinds)):])
 
+# plot the data
+if plots:
+    # plot ps to check
+    for ii in range(10):
+        plt.figure()
+        plt.plot(x_data[ii,:]) #/np.max(np.abs(x_data[ii,:]))+ii)
+        
+    # plot noise to check
+    plt.figure()
+    for ii in range(10):
+        plt.plot(n_data[ii,:]/np.max(np.abs(n_data[ii,:]))+ii)
+
 # do the shifts and make batches
 print("SETTING UP GENERATOR")
 
@@ -109,7 +109,7 @@ x,y=next(my_data)
 
 # PLOT GENERATOR RESULTS
 if plots:
-    for ind in range(2):
+    for ind in range(20):
         fig, (ax0,ax2) = plt.subplots(nrows=2,ncols=1,sharex=True)
         t=1/sr*np.arange(x.shape[1])
         ax0.set_xlabel('Time (s)')
@@ -161,8 +161,9 @@ if train:
     model.save_weights("./"+model_save_file)
 else:
     print('Loading training results from '+model_save_file)
-    model.load_weights("./result_files/"+model_save_file)
+    model.load_weights("./"+model_save_file)
     
+plots=1
 # plot the results
 if plots:
     # training stats
@@ -178,19 +179,19 @@ if plots:
     ax1.set_title(model_save_file)
 
 # See how things went
-my_test_data=unet_tools.my_3comp_data_generator(20,x_data,n_data,sig_test_inds,noise_test_inds,sr,std)
+my_test_data=unet_tools.my_3comp_data_generator(50,x_data,n_data,sig_test_inds,noise_test_inds,sr,std, valid=True)
 x,y=next(my_test_data)
 
 test_predictions=model.predict(x)
 
 # PLOT A FEW EXAMPLES
 if plots:
-    for ind in range(15):
+    for ind in range(50):
         fig, ax1 = plt.subplots()
-        t=1/100*np.arange(x.shape[1])
+        t=np.arange(x.shape[1])
         ax1.set_xlabel('Time (s)')
         ax1.set_ylabel('Amplitude')
-        trace=(np.exp(x[ind,:,0])-epsilon)*x[ind,:,1] #np.multiply(np.power(x[ind,:,0],np.e),x[ind,:,1])
+        trace=(np.exp(x[ind,:,0])-epsilon)*x[ind,:,1] 
         ax1.plot(t, trace, color='tab:red') #, label='data')
         ax1.tick_params(axis='y')
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
