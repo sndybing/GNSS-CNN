@@ -166,7 +166,7 @@ else:
 # plot the results
 if plots:
     # training stats
-    training_stats = np.genfromtxt("./result_files/"+model_save_file+'.csv', delimiter=',',skip_header=1)
+    training_stats = np.genfromtxt("./"+model_save_file+'.csv', delimiter=',',skip_header=1)
     f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
     ax1.plot(training_stats[:,0],training_stats[:,1])
     ax1.plot(training_stats[:,0],training_stats[:,3])
@@ -177,28 +177,28 @@ if plots:
     ax2.set_xlabel('Epoch')
     ax1.set_title(model_save_file)
 
-# # See how things went
-# my_test_data=my_data_generator(20,x_data,n_data,sig_test_inds,noise_test_inds,sr,std,valid=True)
-# x,y=next(my_test_data)
+# See how things went
+my_test_data=unet_tools.my_3comp_data_generator(20,x_data,n_data,sig_test_inds,noise_test_inds,sr,std)
+x,y=next(my_test_data)
 
-# test_predictions=model.predict(x)
+test_predictions=model.predict(x)
 
-# # PLOT A FEW EXAMPLES
-# if plots:
-#     for ind in range(15):
-#         fig, ax1 = plt.subplots()
-#         t=1/100*np.arange(x.shape[1])
-#         ax1.set_xlabel('Time (s)')
-#         ax1.set_ylabel('Amplitude')
-#         trace=np.multiply(np.power(x[ind,:,0],10),x[ind,:,1])
-#         ax1.plot(t, trace, color='tab:red') #, label='data')
-#         ax1.tick_params(axis='y')
-#         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-#         ax2.set_ylabel('Prediction')  # we already handled the x-label with ax1
-#         ax2.plot(t, test_predictions[ind,:], color='tab:blue') #, label='prediction')
-#         ax2.plot(t, y[ind,:], color='black', linestyle='--') #, label='target')
-#         ax2.tick_params(axis='y')
-#         ax2.set_ylim((-0.1,2.1))
-#         fig.tight_layout()  # otherwise the right y-label is slightly clipped
-#         plt.legend(('prediction','target'))
-#         plt.show()
+# PLOT A FEW EXAMPLES
+if plots:
+    for ind in range(15):
+        fig, ax1 = plt.subplots()
+        t=1/100*np.arange(x.shape[1])
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Amplitude')
+        trace=(np.exp(x[ind,:,0])-epsilon)*x[ind,:,1] #np.multiply(np.power(x[ind,:,0],np.e),x[ind,:,1])
+        ax1.plot(t, trace, color='tab:red') #, label='data')
+        ax1.tick_params(axis='y')
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+        ax2.set_ylabel('Prediction')  # we already handled the x-label with ax1
+        ax2.plot(t, test_predictions[ind,:], color='tab:blue') #, label='prediction')
+        ax2.plot(t, y[ind,:], color='black', linestyle='--') #, label='target')
+        ax2.tick_params(axis='y')
+        ax2.set_ylim((-0.1,2.1))
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        plt.legend(('prediction','target'))
+        plt.show()
