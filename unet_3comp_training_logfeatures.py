@@ -13,7 +13,7 @@ import tensorflow as tf
 import numpy as np
 import h5py
 from scipy import signal
-import unet_tools
+import gnss_unet_tools
 import argparse
 
 # # parse arguments
@@ -41,9 +41,9 @@ import argparse
 # std=args.std # how long do you want the gaussian STD to be?
 # sr=args.sr
 
-train=0 #True # do you want to train?
+train=1 #True # do you want to train?
 drop=1 #True # drop?
-plots=0 #False # do you want to make some plots?
+plots=1 #False # do you want to make some plots?
 resume=0 #False # resume training
 large=0.5 # large unet
 epos=50# how many epocs?
@@ -63,10 +63,13 @@ print("sr "+str(sr))
 
 # LOAD THE DATA
 print("LOADING DATA")
-
-n_data = np.load('noise_samples_tunguska.npy')
-x_data = np.load('rupts_0-12_NOISELESS.npy')
-model_save_file="unet_3comp_logfeat_250000_pn_eps_"+str(epos)+"_sr_"+str(sr)+"_std_"+str(std)+".tf" 
+n_data = h5py.File('100k_noise.hdf5', 'r')
+x_data = h5py.File('100k_clean_data.hdf5', 'r')
+model_save_file="gnssunet_3comp_logfeat_250000_pn_eps_"+str(epos)+"_sr_"+str(sr)+"_std_"+str(std)+".tf" 
+x_data=x_data['100k_clean_data'][:,:]
+n_data=n_data['100k_noise'][:,:]
+# TODO: delete this line
+x_data[:,:128]=x_data[:,256:256+128]=x_data[:,512:512+128]=0
         
 if large:
     fac=large
@@ -89,50 +92,53 @@ noise_test_inds=np.sort(noiseinds[int(0.9*len(noiseinds)):])
 
 # plot the data
 if plots:
-    # plot ps to check
-    for ii in range(10):
-        plt.figure()
-        plt.plot(x_data[ii,:]) #/np.max(np.abs(x_data[ii,:]))+ii)
-        
-    # plot noise to check
-    plt.figure()
-    for ii in range(10):
-        plt.plot(n_data[ii,:]/np.max(np.abs(n_data[ii,:]))+ii)
+    # # plot ps to check
+    # plt.figure()
+    # for ii in range(2000):
+    #     plt.plot(x_data[ii,120:136]/np.max(np.abs(x_data[ii,120:136]))) #/np.max(np.abs(x_data[ii,:]))+ii)
 
-# do the shifts and make batches
-print("SETTING UP GENERATOR")
+    plt.figure()
+    for ii in range(2000):
+        plt.plot(x_data[ii,120:136]) #/np.max(np.abs(x_data[ii,:]))+ii)
+    plt.ylim((-0.01,0.01))
+        
+    # # plot noise to check
+    # plt.figure()
+    # for ii in range(20):
+    #     plt.plot(n_data[ii,:]/np.max(np.abs(n_data[ii,:]))+ii)
 
 # generate batch data
 print("FIRST PASS WITH DATA GENERATOR")
-my_data=unet_tools.my_3comp_data_generator(32,x_data,n_data,sig_train_inds,noise_train_inds,sr,std)
-x,y=next(my_data)
+my_data=gnss_unet_tools.my_3comp_data_generator(32,x_data,n_data,sig_train_inds,noise_train_inds,sr,std,valid=True)
+normdata,target,origdata=next(my_data)
 
 # PLOT GENERATOR RESULTS
 if plots:
     for ind in range(20):
-        fig, (ax0,ax2) = plt.subplots(nrows=2,ncols=1,sharex=True)
-        t=1/sr*np.arange(x.shape[1])
-        ax0.set_xlabel('Time (s)')
-        ax0.set_ylabel('Amplitude', color='tab:red')
-        ax0.plot(t, (np.exp(x[ind,:,0])-epsilon)*x[ind,:,1], color='tab:red', label='data')
-        ax0.tick_params(axis='y')
-        ax0.legend(loc="lower right")
-        ax1 = ax0.twinx()  # instantiate a second axes that shares the same x-axis
-        ax1.set_ylabel('Prediction', color='black')  # we already handled the x-label with ax1
-        ax1.plot(t, y[ind,:], color='black', linestyle='--', label='target')
-        ax1.legend(loc="upper right")
-        ax2.plot(t, x[ind,:,0], color='tab:green', label='ln(data amp)')
-        ax2.plot(t, x[ind,:,1], color='tab:blue', label='data sign')
-        fig.tight_layout()  # otherwise the right y-label is slightly clipped
-        ax2.legend(loc="lower right")
+        fig, ax = plt.subplots(nrows=2,ncols=3,sharex=True,figsize=(20,10))
+        t=1/sr*np.arange(normdata.shape[1])
+        for kk in range(3):
+            ax[0,kk].set_xlabel('Time (s)')
+            ax[0,kk].set_ylabel('Amplitude', color='tab:red')
+            ax[0,kk].plot(t, origdata[ind,:,kk], color='tab:red', label='data')
+            ax[0,kk].tick_params(axis='y')
+            ax[0,kk].legend(loc="lower right")
+            ax1 = ax[0,kk].twinx()  # instantiate a second axes that shares the same x-axis
+            ax1.set_ylabel('Prediction', color='black')  # we already handled the x-label with ax1
+            ax1.plot(t, target[ind,:], color='black', linestyle='--', label='target')
+            ax1.legend(loc="upper right")
+            ax[1,kk].plot(t, normdata[ind,:,kk*2], color='tab:green', label='ln(data amp)')
+            ax[1,kk].plot(t, normdata[ind,:,kk*2+1], color='tab:blue', label='data sign')
+            fig.tight_layout()  # otherwise the right y-label is slightly clipped
+            ax[1,kk].legend(loc="lower right")
         # plt.show()
 
 # BUILD THE MODEL
 print("BUILD THE MODEL")
 if drop:
-    model=unet_tools.make_large_unet_drop(fac,sr,ncomps=3)    
+    model=gnss_unet_tools.make_large_unet_drop(fac,sr,ncomps=3)    
 else:
-    model=unet_tools.make_large_unet(fac,sr,ncomps=3)  
+    model=gnss_unet_tools.make_large_unet(fac,sr,ncomps=3)  
         
 # ADD SOME CHECKPOINTS
 print("ADDING CHECKPOINTS")
@@ -153,9 +159,9 @@ if train:
         
     csv_logger = tf.keras.callbacks.CSVLogger(model_save_file+".csv", append=True)
     # unet_tools.my_3comp_data_generator(32,x_data,n_data,sig_train_inds,noise_train_inds,sr,std)
-    history=model.fit_generator(unet_tools.my_3comp_data_generator(batch_size,x_data,n_data,sig_train_inds,noise_train_inds,sr,std),
+    history=model.fit_generator(gnss_unet_tools.my_3comp_data_generator(batch_size,x_data,n_data,sig_train_inds,noise_train_inds,sr,std),
                         steps_per_epoch=(len(sig_train_inds)+len(noise_train_inds))//batch_size,
-                        validation_data=unet_tools.my_3comp_data_generator(batch_size,x_data,n_data,sig_test_inds,noise_test_inds,sr,std),
+                        validation_data=gnss_unet_tools.my_3comp_data_generator(batch_size,x_data,n_data,sig_test_inds,noise_test_inds,sr,std),
                         validation_steps=(len(sig_test_inds)+len(noise_test_inds))//batch_size,
                         epochs=epos, callbacks=[model_checkpoint_callback,csv_logger])
     model.save_weights("./"+model_save_file)
@@ -163,43 +169,24 @@ else:
     print('Loading training results from '+model_save_file)
     model.load_weights("./"+model_save_file)
     
-plots=1
-# plot the results
-if plots:
-    # training stats
-    training_stats = np.genfromtxt("./"+model_save_file+'.csv', delimiter=',',skip_header=1)
-    f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-    ax1.plot(training_stats[:,0],training_stats[:,1])
-    ax1.plot(training_stats[:,0],training_stats[:,3])
-    ax1.legend(('acc','val_acc'))
-    ax2.plot(training_stats[:,0],training_stats[:,2])
-    ax2.plot(training_stats[:,0],training_stats[:,4])
-    ax2.legend(('loss','val_loss'))
-    ax2.set_xlabel('Epoch')
-    ax1.set_title(model_save_file)
+# plots=1
+# # plot the results
+# if plots:
+#     # training stats
+#     training_stats = np.genfromtxt("./"+model_save_file+'.csv', delimiter=',',skip_header=1)
+#     f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+#     ax1.plot(training_stats[:,0],training_stats[:,1])
+#     ax1.plot(training_stats[:,0],training_stats[:,3])
+#     ax1.legend(('acc','val_acc'))
+#     ax2.plot(training_stats[:,0],training_stats[:,2])
+#     ax2.plot(training_stats[:,0],training_stats[:,4])
+#     ax2.legend(('loss','val_loss'))
+#     ax2.set_xlabel('Epoch')
+#     ax1.set_title(model_save_file)
 
-# See how things went
-my_test_data=unet_tools.my_3comp_data_generator(50,x_data,n_data,sig_test_inds,noise_test_inds,sr,std, valid=True)
-x,y=next(my_test_data)
+# # # See how things went
+# # my_test_data=gnss_unet_tools.my_3comp_data_generator(50,x_data,n_data,sig_test_inds,noise_test_inds,sr,std, valid=True)
+# # x,y=next(my_test_data)
 
-test_predictions=model.predict(x)
-
-# PLOT A FEW EXAMPLES
-if plots:
-    for ind in range(50):
-        fig, ax1 = plt.subplots()
-        t=np.arange(x.shape[1])
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Amplitude')
-        trace=(np.exp(x[ind,:,0])-epsilon)*x[ind,:,1] 
-        ax1.plot(t, trace, color='tab:red') #, label='data')
-        ax1.tick_params(axis='y')
-        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-        ax2.set_ylabel('Prediction')  # we already handled the x-label with ax1
-        ax2.plot(t, test_predictions[ind,:], color='tab:blue') #, label='prediction')
-        ax2.plot(t, y[ind,:], color='black', linestyle='--') #, label='target')
-        ax2.tick_params(axis='y')
-        ax2.set_ylim((-0.1,2.1))
-        fig.tight_layout()  # otherwise the right y-label is slightly clipped
-        plt.legend(('prediction','target'))
-        plt.show()
+#
+# # test_predictions=model.predict(x)
