@@ -64,9 +64,9 @@ print("sr "+str(sr))
 # LOAD THE DATA
 print("LOADING DATA")
 n_data = h5py.File('100k_noise.hdf5', 'r')
-x_data = h5py.File('100k_clean_data.hdf5', 'r')
+x_data = h5py.File('100k_clean_data_REDO.hdf5', 'r')
 model_save_file="gnssunet_3comp_logfeat_250000_pn_eps_"+str(epos)+"_sr_"+str(sr)+"_std_"+str(std)+".tf" 
-x_data=x_data['100k_clean_data'][:,:]
+x_data=x_data['100k_REDO'][:,:]
 n_data=n_data['100k_noise'][:,:]
 # TODO: delete this line
 x_data[:,:128]=x_data[:,256:256+128]=x_data[:,512:512+128]=0
@@ -184,9 +184,26 @@ else:
 #     ax2.set_xlabel('Epoch')
 #     ax1.set_title(model_save_file)
 
-# # # See how things went
-# # my_test_data=gnss_unet_tools.my_3comp_data_generator(50,x_data,n_data,sig_test_inds,noise_test_inds,sr,std, valid=True)
-# # x,y=next(my_test_data)
-
-#
-# # test_predictions=model.predict(x)
+# # See how things went
+# my_test_data=gnss_unet_tools.my_3comp_data_generator(50,x_data,n_data,sig_test_inds,noise_test_inds,sr,std, valid=True)
+# normdata,target,origdata=next(my_test_data)
+# test_predictions=model.predict(normdata)
+# if plots:
+#     for ind in range(20):
+#         fig, ax = plt.subplots(nrows=2,ncols=3,sharex=True,figsize=(20,10))
+#         t=1/sr*np.arange(normdata.shape[1])
+#         for kk in range(3):
+#             ax[0,kk].set_xlabel('Time (s)')
+#             ax[0,kk].set_ylabel('Amplitude', color='tab:red')
+#             ax[0,kk].plot(t, origdata[ind,:,kk], color='tab:red', label='data')
+#             ax[0,kk].tick_params(axis='y')
+#             ax[0,kk].legend(loc="lower right")
+#             ax1 = ax[0,kk].twinx()  # instantiate a second axes that shares the same x-axis
+#             ax1.set_ylabel('Prediction', color='black')  # we already handled the x-label with ax1
+#             ax1.plot(t, target[ind,:], color='black', linestyle='--', label='target')
+#             ax1.plot(t, test_predictions[ind,:], color='purple', linestyle='--', label='prediction')
+#             ax1.legend(loc="upper right")
+#             ax[1,kk].plot(t, normdata[ind,:,kk*2], color='tab:green', label='ln(data amp)')
+#             ax[1,kk].plot(t, normdata[ind,:,kk*2+1], color='tab:blue', label='data sign')
+#             fig.tight_layout()  # otherwise the right y-label is slightly clipped
+#             ax[1,kk].legend(loc="lower right")
